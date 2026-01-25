@@ -19,13 +19,13 @@ if 'last_file' not in st.session_state: st.session_state.last_file = None
 # ===================== UI STYLING: LIGHT MAIN / DARK SIDEBAR =====================
 st.markdown("""
 <style>
-    /* MAIN BACKGROUND: Set to White/Light Gray */
+    /* MAIN BACKGROUND: Light */
     .stApp { 
         background-color: #F8FAFC !important; 
         color: #1E293B !important; 
     }
     
-    /* SIDEBAR: Keep Dark & Compact */
+    /* SIDEBAR: Dark & Compact */
     [data-testid="stSidebar"] { 
         background-color: #1E293B !important; 
         border-right: 2px solid #334155; 
@@ -40,7 +40,7 @@ st.markdown("""
     }
     [data-testid="stSidebar"] h3 { color: white !important; }
 
-    /* UPLOADER: Border and Background */
+    /* UPLOADER: Solid background */
     [data-testid="stFileUploader"] {
         border: 2px dashed #4F46E5 !important;
         border-radius: 12px !important;
@@ -79,6 +79,16 @@ st.markdown("""
         border: 1px solid #E2E8F0;
         color: #1E293B;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+    }
+
+    .q-card {
+        background: #F1F5F9;
+        border-left: 5px solid #4F46E5;
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        color: #1E293B;
     }
 
     .kw-pill {
@@ -91,10 +101,20 @@ st.markdown("""
         font-weight: bold;
         margin: 4px;
     }
+
+    /* Main Action Buttons */
+    .stButton > button {
+        width: 100%;
+        background: #4F46E5 !important;
+        color: white !important;
+        font-weight: bold !important;
+        height: 3rem;
+        border-radius: 8px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------ 2. DARK SIDEBAR ------------------
+# ------------------ 2. SIDEBAR ------------------
 with st.sidebar:
     st.markdown("<h3 style='text-align:center;'>⚛️ NEXUS CORE</h3>", unsafe_allow_html=True)
     module = st.radio("WORKSTREAM", ["Executive Summary", "Ask Questions", "PDF Splitter"], index=0)
@@ -112,6 +132,9 @@ def load_models():
 
 real_ai, nlp = load_models()
 
+def clean_txt(text):
+    return text.encode('latin-1', 'replace').decode('latin-1')
+
 # ------------------ 4. MAIN WORKSPACE ------------------
 st.markdown('<div class="main-header"><h1>Intelligence Studio Pro</h1></div>', unsafe_allow_html=True)
 
@@ -121,6 +144,7 @@ if file_source:
     if st.session_state.last_file != file_source.name:
         st.session_state.summary_cache = ""
         st.session_state.keywords_cache = []
+        st.session_state.question_cache = []
         st.session_state.last_file = file_source.name
         st.rerun()
 
@@ -147,20 +171,37 @@ if file_source:
 
         if st.session_state.summary_cache:
             st.markdown(f'<div class="content-card"><b>Summary:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
-            
-            # Keywords Section after Summary
             if st.session_state.keywords_cache:
                 kw_html = "".join([f'<span class="kw-pill">{k}</span>' for k in st.session_state.keywords_cache])
-                st.markdown(f'<div style="margin-top:15px; color:#1E293B;"><b>Keywords:</b><br>{kw_html}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="margin-top:10px;"><b>Keywords:</b><br>{kw_html}</div>', unsafe_allow_html=True)
             
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.download_button(label="📥 DOWNLOAD PDF", data=b"PDF Content Here", file_name="Report.pdf")
+            pdf_gen = FPDF()
+            pdf_gen.add_page(); pdf_gen.set_font("Arial", size=12)
+            pdf_gen.multi_cell(0, 10, txt=clean_txt(st.session_state.summary_cache))
+            st.download_button(label="📥 DOWNLOAD PDF", data=pdf_gen.output(dest='S').encode('latin-1'), file_name="Report.pdf")
 
     elif module == "Ask Questions":
-        st.write("Module Ready.")
+        # RESTORED BUTTON
+        if st.button("🔍 GENERATE QUESTIONS"):
+            with st.spinner("Mining insights..."):
+                with pdfplumber.open(file_source) as pdf:
+                    text = (pdf.pages[0].extract_text() or "") + " " + (pdf.pages[-1].extract_text() or "")
+                doc_q = nlp(text[:10000])
+                subjects = list(dict.fromkeys([chunk.text.strip() for chunk in doc_q.noun_chunks if len(chunk.text) > 6]))
+                templates = ["What are the primary objectives associated with {}?", "How does the document evaluate {}?", "What specific risks involve {}?", "What is the methodology for {}?", "What are the implications of {}?"]
+                if len(subjects) < 10: subjects += ["Operations", "Strategy", "Execution", "Risk", "Outcome"]
+                st.session_state.question_cache = [templates[i % 5].format(subjects[i]) for i in range(10)]
+        
+        for q in st.session_state.question_cache:
+            st.markdown(f'<div class="q-card">{q}</div>', unsafe_allow_html=True)
 
     elif module == "PDF Splitter":
-        st.write(f"Document contains {total_pages} pages.")
+        col1, col2 = st.columns(2)
+        s_p = col1.number_input("Start", 1, total_pages, 1)
+        e_p = col2.number_input("End", 1, total_pages, total_pages)
+        if st.button("✂️ EXPORT PDF"):
+            writer = PdfWriter()
+            for i in range(int(s_p)-1, int(e_p)): writer.add_page(pdf_reader.pages[i])
+            st.download_button("Download", io.BytesIO(writer.write_stream()).getvalue(), "split.pdf")
 
 gc.collect()
-

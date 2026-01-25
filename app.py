@@ -16,12 +16,12 @@ if 'keywords_cache' not in st.session_state: st.session_state.keywords_cache = [
 if 'question_cache' not in st.session_state: st.session_state.question_cache = []
 if 'last_file' not in st.session_state: st.session_state.last_file = None
 
-# ===================== HIGH-CONTRAST & SPACING UI =====================
+# ===================== UI STYLING: HIGH CONTRAST & VISIBILITY =====================
 st.markdown("""
 <style>
     .stApp { background-color: #0F172A; color: #FFFFFF; }
     
-    /* SIDEBAR SPACING: Increased gap between radio options */
+    /* SIDEBAR SPACING */
     [data-testid="stSidebar"] .stRadio div[role="radiogroup"] { 
         gap: 45px !important; 
         padding-top: 30px; 
@@ -29,14 +29,21 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E293B !important; border-right: 2px solid #334155; }
     [data-testid="stSidebar"] .stRadio label p { color: #FFFFFF !important; font-size: 1.1rem !important; }
 
-    /* UPLOADER: Hide the default 'Browse files' text for a cleaner look */
-    [data-testid="stFileUploader"] section button {
-        display: none !important;
-    }
+    /* BROWSE BUTTON VISIBILITY: Forced High-Contrast Indigo */
     [data-testid="stFileUploader"] {
         border: 2px dashed #4F46E5;
         border-radius: 12px;
-        padding: 20px;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.03);
+    }
+    button[data-testid="baseButton-secondary"] {
+        background-color: #4F46E5 !important;
+        color: white !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        font-weight: bold !important;
+        visibility: visible !important;
+        display: block !important;
     }
 
     .main-header {
@@ -64,6 +71,7 @@ st.markdown("""
         font-size: 0.85rem;
         font-weight: bold;
         margin: 5px;
+        border: 1px solid rgba(255,255,255,0.2);
     }
 
     .q-card {
@@ -80,6 +88,7 @@ st.markdown("""
         color: white !important;
         font-weight: bold !important;
         height: 3.5rem;
+        border-radius: 10px !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -109,7 +118,7 @@ def clean_txt(text):
 # ------------------ 4. MAIN WORKSPACE ------------------
 st.markdown('<div class="main-header"><h1>Intelligence Studio Pro</h1><p style="color: #E2E8F0;">Neural Synthesis & Document Analytics</p></div>', unsafe_allow_html=True)
 
-file_source = st.file_uploader("Drop PDF here to activate modules", type="pdf")
+file_source = st.file_uploader("Upload PDF Document", type="pdf")
 
 if file_source:
     if st.session_state.last_file != file_source.name:
@@ -124,7 +133,7 @@ if file_source:
 
     if module == "Executive Summary":
         if st.button("🚀 GENERATE ANALYSIS"):
-            with st.status("Reading & Processing...") as status:
+            with st.status("Analyzing Content...") as status:
                 try:
                     with pdfplumber.open(file_source) as pdf:
                         target_pages = [0, total_pages//2, total_pages-1]
@@ -143,8 +152,8 @@ if file_source:
                     doc_k = nlp(raw_text[:8000].lower())
                     kws = [t.text for t in doc_k if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
                     st.session_state.keywords_cache = [w.upper() for w, c in Counter(kws).most_common(6)]
-                    status.update(label="Analysis Ready", state="complete")
-                except: st.error("Error processing document.")
+                    status.update(label="Complete", state="complete")
+                except: st.error("Processing Error.")
 
         if st.session_state.summary_cache:
             st.markdown(f'<div class="content-card"><b>Neural Summary:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
@@ -152,7 +161,7 @@ if file_source:
             # Keywords Section
             if st.session_state.keywords_cache:
                 kw_html = "".join([f'<span class="kw-pill">{k}</span>' for k in st.session_state.keywords_cache])
-                st.markdown(f'<div style="margin-top:20px; padding:10px;"><b>Key Themes Identified:</b><br>{kw_html}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="margin-top:20px; padding:10px;"><b>Key Themes:</b><br>{kw_html}</div>', unsafe_allow_html=True)
             
             # PDF DOWNLOAD
             pdf_gen = FPDF()
@@ -160,10 +169,10 @@ if file_source:
             pdf_gen.multi_cell(0, 10, txt=clean_txt(st.session_state.summary_cache))
             
             st.markdown("<br>", unsafe_allow_html=True)
-            st.download_button(label="📥 DOWNLOAD REPORT PDF", data=pdf_gen.output(dest='S').encode('latin-1'), file_name="Nexus_Report.pdf", mime="application/pdf")
+            st.download_button(label="📥 DOWNLOAD SUMMARY PDF", data=pdf_gen.output(dest='S').encode('latin-1'), file_name="Summary_Nexus.pdf", mime="application/pdf")
 
     elif module == "Ask Questions":
-        if st.button("🔍 ANALYZE SUBJECTS"):
+        if st.button("🔍 GENERATE QUESTIONS"):
             with st.spinner("Extracting themes..."):
                 with pdfplumber.open(file_source) as pdf:
                     text = (pdf.pages[0].extract_text() or "") + " " + (pdf.pages[-1].extract_text() or "")
@@ -181,7 +190,7 @@ if file_source:
                     "How does the report suggest optimizing {}?",
                     "What is the strategic recommendation regarding {}?"
                 ]
-                if len(subjects) < 10: subjects += ["Operations", "Strategy", "Risk", "Outcome", "Execution"]
+                if len(subjects) < 10: subjects += ["Operations", "Strategy", "Execution", "Compliance", "Risk"]
                 st.session_state.question_cache = [templates[i].format(subjects[i]) for i in range(10)]
 
         for q in st.session_state.question_cache:
@@ -198,3 +207,4 @@ if file_source:
             st.download_button("Download", io.BytesIO(writer.write_stream()).getvalue(), "split.pdf")
 
 gc.collect()
+

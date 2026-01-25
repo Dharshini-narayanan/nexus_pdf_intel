@@ -16,49 +16,54 @@ if 'keywords_cache' not in st.session_state: st.session_state.keywords_cache = [
 if 'question_cache' not in st.session_state: st.session_state.question_cache = []
 if 'last_file' not in st.session_state: st.session_state.last_file = None
 
-# ===================== UI STYLING: FINAL CONTRAST FIX =====================
+# ===================== UI STYLING: UNIVERSAL CONTRAST =====================
 st.markdown("""
 <style>
-    .stApp { background-color: #0F172A; color: #FFFFFF; }
+    /* Force background for the whole app to avoid Light Mode clashes */
+    .stApp { background-color: #0F172A !important; color: #FFFFFF !important; }
     
-    /* SIDEBAR: Reduced gap from 45px to 25px for better fit */
+    /* SIDEBAR: Compact spacing */
     [data-testid="stSidebar"] .stRadio div[role="radiogroup"] { 
-        gap: 25px !important; 
-        padding-top: 20px; 
+        gap: 20px !important; 
+        padding-top: 15px; 
     }
     [data-testid="stSidebar"] { background-color: #1E293B !important; border-right: 2px solid #334155; }
-    [data-testid="stSidebar"] .stRadio label p { color: #FFFFFF !important; font-size: 1.05rem !important; }
+    [data-testid="stSidebar"] .stRadio label p { color: #FFFFFF !important; font-size: 1rem !important; }
 
-    /* UPLOADER: Solid background to make button pop */
+    /* UPLOADER: Forced visibility for both Light/Dark modes */
     [data-testid="stFileUploader"] {
-        border: 2px dashed #4F46E5;
-        border-radius: 12px;
-        padding: 15px;
-        background: #F1F5F9 !important;
+        border: 2px dashed #4F46E5 !important;
+        border-radius: 12px !important;
+        padding: 15px !important;
+        background-color: #F8FAFC !important; /* Forces a light gray area so the black button pops */
     }
     
-    /* THE BUTTON: Solid Black, High Visibility */
+    /* THE BUTTON: Guaranteed Solid Black */
     button[data-testid="baseButton-secondary"] {
         background-color: #000000 !important;
         border: 2px solid #000000 !important;
         border-radius: 8px !important;
-        padding: 8px 30px !important;
-        height: auto !important;
+        padding: 10px 30px !important;
+        display: flex !important;
+        justify-content: center !important;
     }
 
-    /* THE TEXT: Forced White color so 'Browse files' is visible on the black button */
+    /* THE TEXT: Forced High-Contrast White inside the black button */
     button[data-testid="baseButton-secondary"] div p {
         color: #FFFFFF !important;
-        font-weight: 800 !important;
+        font-weight: 900 !important;
         opacity: 1 !important;
+        display: block !important;
     }
 
+    /* UI Elements */
     .main-header {
         background: linear-gradient(90deg, #4F46E5, #7C3AED);
         padding: 1.2rem;
         border-radius: 12px;
         text-align: center;
         margin-bottom: 20px;
+        color: white !important;
     }
 
     .content-card {
@@ -72,21 +77,12 @@ st.markdown("""
     .kw-pill {
         display: inline-block;
         background: #6366F1;
-        color: white;
+        color: white !important;
         padding: 5px 12px;
         border-radius: 20px;
         font-size: 0.8rem;
         font-weight: bold;
         margin: 4px;
-        border: 1px solid rgba(255,255,255,0.2);
-    }
-
-    .q-card {
-        background: rgba(79, 70, 229, 0.1);
-        border-left: 5px solid #818CF8;
-        padding: 15px;
-        margin-bottom: 12px;
-        border-radius: 8px;
     }
 
     .stButton > button {
@@ -104,7 +100,7 @@ st.markdown("""
 with st.sidebar:
     st.markdown("<h2 style='color:white; text-align:center;'>⚛️ NEXUS CORE</h2>", unsafe_allow_html=True)
     module = st.radio("WORKSTREAM", ["Executive Summary", "Ask Questions", "PDF Splitter"], index=0)
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<br><hr style='border: 1px solid #334155;'><br>", unsafe_allow_html=True)
     if st.button("🗑️ RESET"):
         st.session_state.clear()
         st.rerun()
@@ -122,7 +118,7 @@ def clean_txt(text):
     return text.encode('latin-1', 'replace').decode('latin-1')
 
 # ------------------ 4. MAIN WORKSPACE ------------------
-st.markdown('<div class="main-header"><h1>Intelligence Studio Pro</h1><p style="color: #E2E8F0; font-size:0.9rem;">Neural Synthesis & Document Analytics</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>Intelligence Studio Pro</h1><p style="font-size:0.9rem; color: #E2E8F0;">Neural Synthesis & Document Analytics</p></div>', unsafe_allow_html=True)
 
 file_source = st.file_uploader("Upload PDF Document", type="pdf")
 
@@ -153,14 +149,14 @@ if file_source:
                     kws = [t.text for t in doc_k if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
                     st.session_state.keywords_cache = [w.upper() for w, c in Counter(kws).most_common(6)]
                     status.update(label="Complete", state="complete")
-                except: st.error("Error.")
+                except: st.error("Neural processing error.")
 
         if st.session_state.summary_cache:
             st.markdown(f'<div class="content-card"><b>Neural Summary:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
             
             if st.session_state.keywords_cache:
                 kw_html = "".join([f'<span class="kw-pill">{k}</span>' for k in st.session_state.keywords_cache])
-                st.markdown(f'<div style="margin-top:15px; padding-left:5px;"><b>Key Themes:</b><br>{kw_html}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="margin-top:15px; padding-left:5px; color:white;"><b>Key Themes:</b><br>{kw_html}</div>', unsafe_allow_html=True)
             
             pdf_gen = FPDF()
             pdf_gen.add_page(); pdf_gen.set_font("Arial", size=12)
@@ -189,3 +185,4 @@ if file_source:
             st.download_button("Download", io.BytesIO(writer.write_stream()).getvalue(), "split.pdf")
 
 gc.collect()
+

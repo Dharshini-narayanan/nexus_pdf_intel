@@ -181,14 +181,46 @@ if file_source:
             for q in st.session_state.question_cache:
                 st.markdown(f'<div class="q-card">{q}</div>', unsafe_allow_html=True)
 
-    elif module == "PDF Splitter":
-        st.markdown(f'<div class="content-card">This document has <b>{total_pages}</b> pages.</div>', unsafe_allow_html=True)
-        col1, col2 = st.columns(2)
-        s_p = col1.number_input("Start Page", 1, total_pages, 1)
-        e_p = col2.number_input("End Page", 1, total_pages, total_pages)
-        if st.button("✂️ SPLIT & EXPORT"):
-            writer = PdfWriter()
-            for i in range(int(s_p)-1, int(e_p)): writer.add_page(pdf_reader.pages[i])
-            st.download_button("📥 DOWNLOAD SPLIT PDF", io.BytesIO(writer.write_stream()).getvalue(), "Split_Document.pdf")
+   
+def pdf_splitter_module(file_source):
+    # Initialize Reader
+    pdf_reader = PdfReader(file_source)
+    total_pages = len(pdf_reader.pages)
+    
+    st.info(f"Document detected with {total_pages} pages.")
+    
+    # UI Layout for page selection
+    col1, col2 = st.columns(2)
+    with col1:
+        start_page = st.number_input("Start Page", min_value=1, max_value=total_pages, value=1)
+    with col2:
+        end_page = st.number_input("End Page", min_value=1, max_value=total_pages, value=total_pages)
 
-gc.collect()
+    # Validation and Processing
+    if st.button("✂️ EXPORT SELECTED PAGES"):
+        if start_page > end_page:
+            st.error("Start page cannot be greater than end page.")
+        else:
+            with st.spinner("Splitting PDF..."):
+                writer = PdfWriter()
+                
+                # Add selected range (Note: pypdf uses 0-based indexing)
+                for i in range(int(start_page) - 1, int(end_page)):
+                    writer.add_page(pdf_reader.pages[i])
+                
+                # Use BytesIO to store the new PDF in memory
+                output_data = io.BytesIO()
+                writer.write(output_data)
+                
+                # The fix: Ensure .getvalue() has parentheses ()
+                st.download_button(
+                    label="📥 DOWNLOAD SPLIT PDF",
+                    data=output_data.getvalue(), 
+                    file_name=f"Split_Pages_{start_page}to{end_page}.pdf",
+                    mime="application/pdf"
+                )
+                st.success(f"Pages {start_page} to {end_page} are ready for download!")
+
+# Usage in your app:
+# if module == "PDF Splitter":
+#     pdf_splitter_module(file_source)

@@ -16,58 +16,49 @@ if 'keywords_cache' not in st.session_state: st.session_state.keywords_cache = [
 if 'question_cache' not in st.session_state: st.session_state.question_cache = []
 if 'last_file' not in st.session_state: st.session_state.last_file = None
 
-# ===================== UI STYLING: HIGH VISIBILITY BLACK BUTTON =====================
+# ===================== UI STYLING: FINAL CONTRAST FIX =====================
 st.markdown("""
 <style>
     .stApp { background-color: #0F172A; color: #FFFFFF; }
     
-    /* SIDEBAR SPACING */
+    /* SIDEBAR: Reduced gap from 45px to 25px for better fit */
     [data-testid="stSidebar"] .stRadio div[role="radiogroup"] { 
-        gap: 45px !important; 
-        padding-top: 30px; 
+        gap: 25px !important; 
+        padding-top: 20px; 
     }
     [data-testid="stSidebar"] { background-color: #1E293B !important; border-right: 2px solid #334155; }
-    [data-testid="stSidebar"] .stRadio label p { color: #FFFFFF !important; font-size: 1.1rem !important; }
+    [data-testid="stSidebar"] .stRadio label p { color: #FFFFFF !important; font-size: 1.05rem !important; }
 
-    /* UPLOADER & THE INVISIBLE BUTTON FIX */
+    /* UPLOADER: Solid background to make button pop */
     [data-testid="stFileUploader"] {
         border: 2px dashed #4F46E5;
         border-radius: 12px;
         padding: 15px;
-        background: #F8FAFC !important; /* Light background for contrast */
+        background: #F1F5F9 !important;
     }
     
-    /* Target the Browse Button specifically to make it BLACK and VISIBLE */
+    /* THE BUTTON: Solid Black, High Visibility */
     button[data-testid="baseButton-secondary"] {
         background-color: #000000 !important;
-        color: #000000 !important; /* Hide original text */
         border: 2px solid #000000 !important;
-        padding: 8px 35px !important;
-        position: relative;
-        overflow: hidden;
         border-radius: 8px !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        padding: 8px 30px !important;
+        height: auto !important;
     }
-    
-    /* Overlay a white icon so the user knows to click it */
-    button[data-testid="baseButton-secondary"]::after {
-        content: "UPLOAD";
-        color: white !important;
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 0.8rem;
-        font-weight: 800;
-        letter-spacing: 1px;
+
+    /* THE TEXT: Forced White color so 'Browse files' is visible on the black button */
+    button[data-testid="baseButton-secondary"] div p {
+        color: #FFFFFF !important;
+        font-weight: 800 !important;
+        opacity: 1 !important;
     }
 
     .main-header {
         background: linear-gradient(90deg, #4F46E5, #7C3AED);
-        padding: 1.5rem;
+        padding: 1.2rem;
         border-radius: 12px;
         text-align: center;
-        margin-bottom: 25px;
+        margin-bottom: 20px;
     }
 
     .content-card {
@@ -82,19 +73,19 @@ st.markdown("""
         display: inline-block;
         background: #6366F1;
         color: white;
-        padding: 6px 14px;
+        padding: 5px 12px;
         border-radius: 20px;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         font-weight: bold;
-        margin: 5px;
+        margin: 4px;
         border: 1px solid rgba(255,255,255,0.2);
     }
 
     .q-card {
-        background: rgba(79, 70, 229, 0.15);
+        background: rgba(79, 70, 229, 0.1);
         border-left: 5px solid #818CF8;
         padding: 15px;
-        margin-bottom: 15px;
+        margin-bottom: 12px;
         border-radius: 8px;
     }
 
@@ -103,19 +94,18 @@ st.markdown("""
         background: #4F46E5 !important;
         color: white !important;
         font-weight: bold !important;
-        height: 3.5rem;
-        border-radius: 10px !important;
+        height: 3rem;
+        border-radius: 8px !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------ 2. PERMANENT SIDEBAR ------------------
+# ------------------ 2. SIDEBAR ------------------
 with st.sidebar:
     st.markdown("<h2 style='color:white; text-align:center;'>⚛️ NEXUS CORE</h2>", unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
     module = st.radio("WORKSTREAM", ["Executive Summary", "Ask Questions", "PDF Splitter"], index=0)
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    if st.button("🗑️ RESET SYSTEM"):
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    if st.button("🗑️ RESET"):
         st.session_state.clear()
         st.rerun()
 
@@ -132,7 +122,7 @@ def clean_txt(text):
     return text.encode('latin-1', 'replace').decode('latin-1')
 
 # ------------------ 4. MAIN WORKSPACE ------------------
-st.markdown('<div class="main-header"><h1>Intelligence Studio Pro</h1><p style="color: #E2E8F0;">Neural Synthesis & Document Analytics</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>Intelligence Studio Pro</h1><p style="color: #E2E8F0; font-size:0.9rem;">Neural Synthesis & Document Analytics</p></div>', unsafe_allow_html=True)
 
 file_source = st.file_uploader("Upload PDF Document", type="pdf")
 
@@ -149,71 +139,47 @@ if file_source:
 
     if module == "Executive Summary":
         if st.button("🚀 GENERATE ANALYSIS"):
-            with st.status("Analyzing Content...") as status:
+            with st.status("Analyzing...") as status:
                 try:
                     with pdfplumber.open(file_source) as pdf:
                         target_pages = [0, total_pages//2, total_pages-1]
-                        raw_text = ""
-                        for p in target_pages:
-                            txt = pdf.pages[p].extract_text()
-                            if txt: raw_text += txt + " "
+                        raw_text = "".join([p.extract_text() or "" for p in [pdf.pages[i] for i in target_pages]])
                     
                     chunks = [raw_text[i:i+900] for i in range(0, min(len(raw_text), 2700), 900)]
-                    summaries = []
-                    for chunk in chunks:
-                        res = real_ai(chunk, max_length=50, min_length=20, do_sample=False)[0]['summary_text']
-                        summaries.append(res)
+                    summaries = [real_ai(c, max_length=50, min_length=20, do_sample=False)[0]['summary_text'] for c in chunks]
                     st.session_state.summary_cache = ". ".join(summaries).replace(" .", ".")
                     
                     doc_k = nlp(raw_text[:8000].lower())
                     kws = [t.text for t in doc_k if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
                     st.session_state.keywords_cache = [w.upper() for w, c in Counter(kws).most_common(6)]
                     status.update(label="Complete", state="complete")
-                except: st.error("Processing Error.")
+                except: st.error("Error.")
 
         if st.session_state.summary_cache:
             st.markdown(f'<div class="content-card"><b>Neural Summary:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
             
-            # Keywords Section
             if st.session_state.keywords_cache:
                 kw_html = "".join([f'<span class="kw-pill">{k}</span>' for k in st.session_state.keywords_cache])
-                st.markdown(f'<div style="margin-top:20px; padding:10px;"><b>Key Themes:</b><br>{kw_html}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="margin-top:15px; padding-left:5px;"><b>Key Themes:</b><br>{kw_html}</div>', unsafe_allow_html=True)
             
-            # PDF DOWNLOAD
             pdf_gen = FPDF()
             pdf_gen.add_page(); pdf_gen.set_font("Arial", size=12)
             pdf_gen.multi_cell(0, 10, txt=clean_txt(st.session_state.summary_cache))
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.download_button(label="📥 DOWNLOAD SUMMARY PDF", data=pdf_gen.output(dest='S').encode('latin-1'), file_name="Summary_Nexus.pdf", mime="application/pdf")
+            st.download_button(label="📥 DOWNLOAD REPORT", data=pdf_gen.output(dest='S').encode('latin-1'), file_name="Nexus_Report.pdf", mime="application/pdf")
 
     elif module == "Ask Questions":
         if st.button("🔍 GENERATE QUESTIONS"):
-            with st.spinner("Extracting themes..."):
+            with st.spinner("Analyzing themes..."):
                 with pdfplumber.open(file_source) as pdf:
                     text = (pdf.pages[0].extract_text() or "") + " " + (pdf.pages[-1].extract_text() or "")
-                doc_q = nlp(text[:12000])
+                doc_q = nlp(text[:10000])
                 subjects = list(dict.fromkeys([chunk.text.strip() for chunk in doc_q.noun_chunks if len(chunk.text) > 6]))
-                templates = [
-                    "What are the primary objectives associated with {}?",
-                    "How does the document evaluate the impact of {}?",
-                    "What specific risks are noted regarding {}?",
-                    "Can you explain the methodology used to address {}?",
-                    "What are the long-term implications of {}?",
-                    "How is the success of {} measured?",
-                    "What evidence supports the findings on {}?",
-                    "Are there any compliance factors involving {}?",
-                    "How does the report suggest optimizing {}?",
-                    "What is the strategic recommendation regarding {}?"
-                ]
-                if len(subjects) < 10: subjects += ["Operations", "Strategy", "Execution", "Compliance", "Risk"]
-                st.session_state.question_cache = [templates[i].format(subjects[i]) for i in range(10)]
-
-        for q in st.session_state.question_cache:
-            st.markdown(f'<div class="q-card">{q}</div>', unsafe_allow_html=True)
+                templates = ["What are the primary objectives associated with {}?", "How does the document evaluate {}?", "What specific risks involve {}?", "What is the methodology for {}?", "What are the implications of {}?"]
+                if len(subjects) < 10: subjects += ["Operations", "Strategy", "Execution", "Risk", "Outcome"]
+                st.session_state.question_cache = [templates[i % 5].format(subjects[i]) for i in range(10)]
+        for q in st.session_state.question_cache: st.markdown(f'<div class="q-card">{q}</div>', unsafe_allow_html=True)
 
     elif module == "PDF Splitter":
-        st.markdown('<div class="content-card">Select page range:</div>', unsafe_allow_html=True)
         col1, col2 = st.columns(2)
         s_p = col1.number_input("Start", 1, total_pages, 1)
         e_p = col2.number_input("End", 1, total_pages, total_pages)

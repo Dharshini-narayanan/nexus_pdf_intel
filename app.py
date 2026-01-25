@@ -16,13 +16,13 @@ if 'keywords_cache' not in st.session_state: st.session_state.keywords_cache = [
 if 'question_cache' not in st.session_state: st.session_state.question_cache = []
 if 'last_file' not in st.session_state: st.session_state.last_file = None
 
-# ===================== UI STYLING: UNIVERSAL CONTRAST =====================
+# ===================== UI STYLING: RED BROWSE BUTTON & DARK THEME =====================
 st.markdown("""
 <style>
-    /* Force background for the whole app to avoid Light Mode clashes */
+    /* Global App Background */
     .stApp { background-color: #0F172A !important; color: #FFFFFF !important; }
     
-    /* SIDEBAR: Compact spacing */
+    /* SIDEBAR: Compact and professional spacing */
     [data-testid="stSidebar"] .stRadio div[role="radiogroup"] { 
         gap: 20px !important; 
         padding-top: 15px; 
@@ -30,25 +30,25 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E293B !important; border-right: 2px solid #334155; }
     [data-testid="stSidebar"] .stRadio label p { color: #FFFFFF !important; font-size: 1rem !important; }
 
-    /* UPLOADER: Forced visibility for both Light/Dark modes */
+    /* UPLOADER: Light background to provide high contrast for the red button */
     [data-testid="stFileUploader"] {
         border: 2px dashed #4F46E5 !important;
         border-radius: 12px !important;
         padding: 15px !important;
-        background-color: #F8FAFC !important; /* Forces a light gray area so the black button pops */
+        background-color: #F8FAFC !important;
     }
     
-    /* THE BUTTON: Guaranteed Solid Black */
+    /* THE BUTTON: Forced Solid RED */
     button[data-testid="baseButton-secondary"] {
-        background-color: #000000 !important;
-        border: 2px solid #000000 !important;
+        background-color: #FF0000 !important; /* RED COLOR */
+        border: 2px solid #D00000 !important;
         border-radius: 8px !important;
         padding: 10px 30px !important;
         display: flex !important;
         justify-content: center !important;
     }
 
-    /* THE TEXT: Forced High-Contrast White inside the black button */
+    /* THE TEXT: Forced White on Red background */
     button[data-testid="baseButton-secondary"] div p {
         color: #FFFFFF !important;
         font-weight: 900 !important;
@@ -56,7 +56,6 @@ st.markdown("""
         display: block !important;
     }
 
-    /* UI Elements */
     .main-header {
         background: linear-gradient(90deg, #4F46E5, #7C3AED);
         padding: 1.2rem;
@@ -96,7 +95,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------ 2. SIDEBAR ------------------
+# ------------------ 2. PERMANENT SIDEBAR ------------------
 with st.sidebar:
     st.markdown("<h2 style='color:white; text-align:center;'>⚛️ NEXUS CORE</h2>", unsafe_allow_html=True)
     module = st.radio("WORKSTREAM", ["Executive Summary", "Ask Questions", "PDF Splitter"], index=0)
@@ -154,13 +153,16 @@ if file_source:
         if st.session_state.summary_cache:
             st.markdown(f'<div class="content-card"><b>Neural Summary:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
             
+            # Keywords Section
             if st.session_state.keywords_cache:
                 kw_html = "".join([f'<span class="kw-pill">{k}</span>' for k in st.session_state.keywords_cache])
                 st.markdown(f'<div style="margin-top:15px; padding-left:5px; color:white;"><b>Key Themes:</b><br>{kw_html}</div>', unsafe_allow_html=True)
             
+            # PDF DOWNLOAD
             pdf_gen = FPDF()
             pdf_gen.add_page(); pdf_gen.set_font("Arial", size=12)
             pdf_gen.multi_cell(0, 10, txt=clean_txt(st.session_state.summary_cache))
+            st.markdown("<br>", unsafe_allow_html=True)
             st.download_button(label="📥 DOWNLOAD REPORT", data=pdf_gen.output(dest='S').encode('latin-1'), file_name="Nexus_Report.pdf", mime="application/pdf")
 
     elif module == "Ask Questions":
@@ -185,4 +187,5 @@ if file_source:
             st.download_button("Download", io.BytesIO(writer.write_stream()).getvalue(), "split.pdf")
 
 gc.collect()
+
 

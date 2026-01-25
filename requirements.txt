@@ -3,7 +3,7 @@ pdfplumber
 pypdf
 langchain-text-splitters
 transformers
-torch
+torch --index-url https://download.pytorch.org/whl/cpu
 spacy
 fpdf
 rich==13.7.0

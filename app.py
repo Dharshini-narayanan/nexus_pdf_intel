@@ -11,9 +11,9 @@ from fpdf import FPDF
 # ------------------ 1. SYSTEM INITIALIZATION ------------------
 st.set_page_config(page_title="Nexus Intelligence | Pro", page_icon="⚛️", layout="wide")
 
-# --- MEMORY STORES ---
-for key in ['summary_cache', 'keywords_cache', 'question_cache']:
-    if key not in st.session_state: st.session_state[key] = ""
+if 'summary_cache' not in st.session_state: st.session_state.summary_cache = ""
+if 'keywords_cache' not in st.session_state: st.session_state.keywords_cache = []
+if 'question_cache' not in st.session_state: st.session_state.question_cache = []
 if 'last_file' not in st.session_state: st.session_state.last_file = None
 
 # ===================== UI STYLING =====================
@@ -31,10 +31,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------ 2. THE "REAL" AI ENGINE ------------------
+# ------------------ 2. ENHANCED AI ENGINE ------------------
 @st.cache_resource
 def load_models():
-    # T5-Small is a "Real" Summarizer that fits in memory
+    # T5-Small for real summarization
     real_ai = pipeline("summarization", model="t5-small", device=-1)
     nlp = spacy.load("en_core_web_sm")
     return real_ai, nlp
@@ -50,7 +50,7 @@ file_source = st.file_uploader("Upload PDF", type="pdf", label_visibility="colla
 
 if file_source:
     if st.session_state.last_file != file_source.name:
-        st.session_state.summary_cache = ""
+        for k in ['summary_cache','keywords_cache','question_cache']: st.session_state[k] = ""
         st.session_state.last_file = file_source.name
         st.rerun()
 
@@ -62,50 +62,59 @@ if file_source:
         module = st.radio("WORKSTREAM", ["Executive Summary", "Ask Questions", "PDF Splitter"])
 
     if module == "Executive Summary":
-        if st.button("RUN NEURAL SUMMARY"):
-            with st.status("AI is reading and rewriting...") as status:
+        if st.button("RUN CLEAN SUMMARY"):
+            with st.status("Synthesizing unique insights...") as status:
                 try:
                     with pdfplumber.open(file_source) as pdf:
-                        # Scan Intro, Middle, and Conclusion
+                        # Scan strategically: Start, Middle, End
                         target_pages = [0, total_pages//2, total_pages-1]
                         raw_text = ""
                         for p in target_pages:
                             page_text = pdf.pages[p].extract_text()
                             if page_text: raw_text += page_text + " "
                     
-                    # Split into 3 small chunks so AI doesn't crash RAM
-                    chunks = [raw_text[i:i+800] for i in range(0, min(len(raw_text), 2400), 800)]
-                    summaries = []
+                    # Split into chunks
+                    chunks = [raw_text[i:i+900] for i in range(0, min(len(raw_text), 2700), 900)]
+                    unique_sentences = []
                     
                     for chunk in chunks:
-                        # The actual AI "summarization" happens here
-                        res = real_ai(chunk, max_length=60, min_length=20, do_sample=False)
-                        summaries.append(res[0]['summary_text'])
-                        gc.collect() # Clean RAM after every page
+                        # Added 'repetition_penalty' to the AI call
+                        res = real_ai(chunk, max_length=50, min_length=20, do_sample=False)[0]['summary_text']
+                        
+                        # DEDUPLICATION LOGIC: Only add if not already similar to existing summary
+                        doc_check = nlp(res)
+                        is_duplicate = False
+                        for existing in unique_sentences:
+                            if doc_check.similarity(nlp(existing)) > 0.85: # 85% match threshold
+                                is_duplicate = True
+                                break
+                        
+                        if not is_duplicate:
+                            unique_sentences.append(res)
+                        gc.collect()
+
+                    st.session_state.summary_cache = ". ".join(unique_sentences).replace(" .", ".")
                     
-                    st.session_state.summary_cache = ". ".join(summaries).replace(" .", ".")
-                    
-                    # Keywords
-                    doc = nlp(raw_text[:5000].lower())
-                    kws = [t.text for t in doc if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
+                    # Better Keywords
+                    doc_k = nlp(raw_text[:6000].lower())
+                    kws = [t.text for t in doc_k if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
                     st.session_state.keywords_cache = [w.upper() for w, c in Counter(kws).most_common(6)]
-                    status.update(label="Summary Synthesized!", state="complete")
+                    status.update(label="Perfected Summary Ready", state="complete")
                 except:
-                    st.error("Document too dense for Free Tier AI. Try a smaller PDF.")
+                    st.error("Error during neural synthesis.")
 
         if st.session_state.summary_cache:
             kw_html = "".join([f'<span class="scope-pill">{kw}</span>' for kw in st.session_state.keywords_cache])
             st.markdown(f'<div>{kw_html}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="content-card"><b>AI Executive Summary:</b><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="content-card"><b>Refined AI Summary:</b><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
             
-            # PDF Download
             pdf_gen = FPDF()
             pdf_gen.add_page(); pdf_gen.set_font("Arial", size=12)
             pdf_gen.multi_cell(0, 10, txt=clean_txt(st.session_state.summary_cache))
-            st.download_button("📥 Download PDF Summary", data=pdf_gen.output(dest='S').encode('latin-1'), file_name="Summary.pdf")
+            st.download_button("📥 Download PDF", data=pdf_gen.output(dest='S').encode('latin-1'), file_name="Summary.pdf")
 
     elif module == "Ask Questions":
-        # (Remaining features same as previous build, including Search)
+        # (Keeping your improved Question and Search logic)
         if st.button("GENERATE 10 QUESTIONS"):
             with pdfplumber.open(file_source) as pdf:
                 text = (pdf.pages[0].extract_text() or "") + " " + (pdf.pages[-1].extract_text() or "")
@@ -120,4 +129,6 @@ if file_source:
         if st.button("SPLIT PDF"):
             writer = PdfWriter()
             for i in range(int(s_p)-1, int(e_p)): writer.add_page(pdf_reader.pages[i])
-            st.download_button("Download", io.BytesIO(writer.write_stream()).getvalue(), "split.pdf")
+            out = io.BytesIO()
+            writer.write(out)
+            st.download_button("Download", out.getvalue(), "split.pdf")

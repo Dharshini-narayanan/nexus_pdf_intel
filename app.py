@@ -16,13 +16,13 @@ if 'keywords_cache' not in st.session_state: st.session_state.keywords_cache = [
 if 'question_cache' not in st.session_state: st.session_state.question_cache = []
 if 'last_file' not in st.session_state: st.session_state.last_file = None
 
-# ===================== UI STYLING: RED BROWSE BUTTON & DARK THEME =====================
+# ===================== UI STYLING: RED BUTTON & DARK MODE =====================
 st.markdown("""
 <style>
-    /* Global App Background */
+    /* Global App Background - Forced Dark */
     .stApp { background-color: #0F172A !important; color: #FFFFFF !important; }
     
-    /* SIDEBAR: Compact and professional spacing */
+    /* SIDEBAR: Compact spacing */
     [data-testid="stSidebar"] .stRadio div[role="radiogroup"] { 
         gap: 20px !important; 
         padding-top: 15px; 
@@ -30,7 +30,7 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E293B !important; border-right: 2px solid #334155; }
     [data-testid="stSidebar"] .stRadio label p { color: #FFFFFF !important; font-size: 1rem !important; }
 
-    /* UPLOADER: Light background to provide high contrast for the red button */
+    /* UPLOADER: Light background to make the RED button pop */
     [data-testid="stFileUploader"] {
         border: 2px dashed #4F46E5 !important;
         border-radius: 12px !important;
@@ -40,15 +40,15 @@ st.markdown("""
     
     /* THE BUTTON: Forced Solid RED */
     button[data-testid="baseButton-secondary"] {
-        background-color: #FF0000 !important; /* RED COLOR */
-        border: 2px solid #D00000 !important;
+        background-color: #E11D48 !important; /* Professional Crimson Red */
+        border: 2px solid #BE123C !important;
         border-radius: 8px !important;
         padding: 10px 30px !important;
         display: flex !important;
         justify-content: center !important;
     }
 
-    /* THE TEXT: Forced White on Red background */
+    /* THE TEXT: Forced High-Contrast White inside the red button */
     button[data-testid="baseButton-secondary"] div p {
         color: #FFFFFF !important;
         font-weight: 900 !important;
@@ -95,7 +95,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------ 2. PERMANENT SIDEBAR ------------------
+# ------------------ 2. SIDEBAR ------------------
 with st.sidebar:
     st.markdown("<h2 style='color:white; text-align:center;'>⚛️ NEXUS CORE</h2>", unsafe_allow_html=True)
     module = st.radio("WORKSTREAM", ["Executive Summary", "Ask Questions", "PDF Splitter"], index=0)
@@ -148,7 +148,7 @@ if file_source:
                     kws = [t.text for t in doc_k if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
                     st.session_state.keywords_cache = [w.upper() for w, c in Counter(kws).most_common(6)]
                     status.update(label="Complete", state="complete")
-                except: st.error("Neural processing error.")
+                except: st.error("Processing Error.")
 
         if st.session_state.summary_cache:
             st.markdown(f'<div class="content-card"><b>Neural Summary:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
@@ -187,5 +187,4 @@ if file_source:
             st.download_button("Download", io.BytesIO(writer.write_stream()).getvalue(), "split.pdf")
 
 gc.collect()
-
 

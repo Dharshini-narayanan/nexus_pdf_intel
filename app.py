@@ -16,7 +16,7 @@ if 'keywords_cache' not in st.session_state: st.session_state.keywords_cache = [
 if 'question_cache' not in st.session_state: st.session_state.question_cache = []
 if 'last_file' not in st.session_state: st.session_state.last_file = None
 
-# ===================== UI STYLING: HIGH CONTRAST & VISIBILITY =====================
+# ===================== UI STYLING: CUSTOM BUTTON & SPACING =====================
 st.markdown("""
 <style>
     .stApp { background-color: #0F172A; color: #FFFFFF; }
@@ -29,21 +29,33 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #1E293B !important; border-right: 2px solid #334155; }
     [data-testid="stSidebar"] .stRadio label p { color: #FFFFFF !important; font-size: 1.1rem !important; }
 
-    /* BROWSE BUTTON VISIBILITY: Forced High-Contrast Indigo */
+    /* UPLOADER & BLACK BROWSE BUTTON */
     [data-testid="stFileUploader"] {
         border: 2px dashed #4F46E5;
         border-radius: 12px;
         padding: 15px;
         background: rgba(255, 255, 255, 0.03);
     }
+    
+    /* Target the Browse Button: Change to Black and Hide Text */
     button[data-testid="baseButton-secondary"] {
-        background-color: #4F46E5 !important;
-        color: white !important;
-        border: none !important;
-        padding: 10px 24px !important;
-        font-weight: bold !important;
-        visibility: visible !important;
-        display: block !important;
+        background-color: #000000 !important;
+        color: transparent !important; /* Hides the 'Browse files' text */
+        border: 1px solid #4F46E5 !important;
+        padding: 10px 40px !important;
+        position: relative;
+    }
+    
+    /* Add an icon or small indicator so users know it's a button */
+    button[data-testid="baseButton-secondary"]::after {
+        content: "📁";
+        color: white;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 1.2rem;
+        visibility: visible;
     }
 
     .main-header {
@@ -207,4 +219,5 @@ if file_source:
             st.download_button("Download", io.BytesIO(writer.write_stream()).getvalue(), "split.pdf")
 
 gc.collect()
+
 

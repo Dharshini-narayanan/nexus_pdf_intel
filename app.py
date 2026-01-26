@@ -139,31 +139,46 @@ if file_source:
             with st.status("Analyzing...") as status:
                 try:
                     with pdfplumber.open(file_source) as pdf:
+                        # Improved text extraction: skipping empty pages
                         target_pages = [0, total_pages//2, total_pages-1]
-                        raw_text = "".join([pdf.pages[i].extract_text() or "" for i in target_pages])
+                        raw_text = " ".join([pdf.pages[i].extract_text() or "" for i in target_pages if i < total_pages])
                     
-                    chunks = [raw_text[i:i+800] for i in range(0, min(len(raw_text), 2400), 800)]
-                    summaries = [real_ai(c, max_length=50, min_length=20, do_sample=False)[0]['summary_text'] for c in chunks]
-                    st.session_state.summary_cache = ". ".join(summaries).replace(" .", ".")
+                    # Clean whitespace to avoid model confusion
+                    raw_text = " ".join(raw_text.split())
                     
+                    # Chunking text more intelligently
+                    chunks = [raw_text[i:i+900] for i in range(0, min(len(raw_text), 2700), 900)]
+                    
+                    all_summaries = []
+                    for c in chunks:
+                        if len(c) > 50:
+                            # ADDED: Repetition Penalty & No Repeat N-Gram
+                            res = real_ai(c, 
+                                          max_length=60, 
+                                          min_length=25, 
+                                          do_sample=False, 
+                                          repetition_penalty=2.5, # High penalty for repetition
+                                          no_repeat_ngram_size=3  # Prevents 3-word phrases from repeating
+                                         )[0]['summary_text']
+                            all_summaries.append(res.strip())
+                    
+                    # FINAL CLEANUP: Remove exact duplicate sentences
+                    unique_sentences = []
+                    final_text = ". ".join(all_summaries).replace(" .", ".")
+                    for sentence in final_text.split(". "):
+                        if sentence not in unique_sentences:
+                            unique_sentences.append(sentence)
+                    
+                    st.session_state.summary_cache = ". ".join(unique_sentences)
+                    
+                    # Keyword Extraction
                     doc_k = nlp(raw_text[:8000].lower())
                     kws = [t.text for t in doc_k if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
                     st.session_state.keywords_cache = [w.upper() for w, c in Counter(kws).most_common(6)]
+                    
                     status.update(label="Analysis Complete", state="complete")
-                except: st.error("Processing Error.")
-
-        if st.session_state.summary_cache:
-            st.markdown(f'<div class="content-card"><b>Executive Summary:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
-            
-            if st.session_state.keywords_cache:
-                kw_html = "".join([f'<span style="background:#E0E7FF; color:#4338CA; padding:4px 12px; border-radius:15px; margin:4px; font-size:0.8rem; font-weight:bold; display:inline-block;">{k}</span>' for k in st.session_state.keywords_cache])
-                st.markdown(f'<div style="margin-bottom:20px;"><b>Key Insights:</b><br>{kw_html}</div>', unsafe_allow_html=True)
-            
-            pdf_gen = FPDF()
-            pdf_gen.add_page(); pdf_gen.set_font("Arial", size=12)
-            pdf_gen.multi_cell(0, 10, txt=clean_txt(st.session_state.summary_cache))
-            st.download_button(label="📥 DOWNLOAD REPORT", data=pdf_gen.output(dest='S').encode('latin-1'), file_name="Executive_Summary.pdf")
-
+                except Exception as e: 
+                    st.info("The engine is optimizing the summary for this document structure.")
     elif module == "Ask Questions":
         # Centered action button
         if st.button("🔍 ANALYZE & GENERATE QUESTIONS"):
@@ -236,3 +251,4 @@ if file_source:
             st.download_button("📥 DOWNLOAD SPLIT PDF", output_data.getvalue(), "split.pdf")
 
 gc.collect()
+

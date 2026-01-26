@@ -133,52 +133,85 @@ if file_source:
 
     pdf_reader = PdfReader(file_source)
     total_pages = len(pdf_reader.pages)
-
-    if module == "Executive Summary":
+if module == "Executive Summary":
         if st.button("🚀 EXECUTE SUMMARY"):
             with st.status("Analyzing...") as status:
                 try:
                     with pdfplumber.open(file_source) as pdf:
-                        # Improved text extraction: skipping empty pages
-                        target_pages = [0, total_pages//2, total_pages-1]
-                        raw_text = " ".join([pdf.pages[i].extract_text() or "" for i in target_pages if i < total_pages])
+                        # Extract from beginning, middle, and end for a balanced view
+                        target_indices = [0, total_pages//2, total_pages-1]
+                        # Use a set to avoid duplicate page processing if it's a 1-page PDF
+                        unique_indices = sorted(list(set([i for i in target_indices if i < total_pages])))
+                        raw_text = " ".join([pdf.pages[i].extract_text() or "" for i in unique_indices])
                     
-                    # Clean whitespace to avoid model confusion
-                    raw_text = " ".join(raw_text.split())
+                    # Pre-processing: Clean weird spacing that causes AI looping
+                    clean_input = " ".join(raw_text.split())
                     
-                    # Chunking text more intelligently
-                    chunks = [raw_text[i:i+900] for i in range(0, min(len(raw_text), 2700), 900)]
+                    # Break into manageable chunks for T5-Small
+                    chunks = [clean_input[i:i+900] for i in range(0, min(len(clean_input), 2700), 900)]
                     
-                    all_summaries = []
+                    processed_chunks = []
                     for c in chunks:
-                        if len(c) > 50:
-                            # ADDED: Repetition Penalty & No Repeat N-Gram
-                            res = real_ai(c, 
-                                          max_length=60, 
-                                          min_length=25, 
-                                          do_sample=False, 
-                                          repetition_penalty=2.5, # High penalty for repetition
-                                          no_repeat_ngram_size=3  # Prevents 3-word phrases from repeating
-                                         )[0]['summary_text']
-                            all_summaries.append(res.strip())
+                        if len(c.strip()) > 40:
+                            # AI Logic: repetition_penalty and no_repeat_ngram_size prevent "looping"
+                            summary_out = real_ai(
+                                c, 
+                                max_length=60, 
+                                min_length=25, 
+                                do_sample=False,
+                                repetition_penalty=3.0,     # Heavily discourages repeating words
+                                no_repeat_ngram_size=3      # Prevents repeating 3-word phrases
+                            )[0]['summary_text']
+                            processed_chunks.append(summary_out.strip())
+
+                    # Final Post-Processing: Remove identical sentences across chunks
+                    final_sentences = []
+                    combined_text = " ".join(processed_chunks)
+                    for sentence in combined_text.split(". "):
+                        s = sentence.strip()
+                        if s and s not in final_sentences:
+                            final_sentences.append(s)
                     
-                    # FINAL CLEANUP: Remove exact duplicate sentences
-                    unique_sentences = []
-                    final_text = ". ".join(all_summaries).replace(" .", ".")
-                    for sentence in final_text.split(". "):
-                        if sentence not in unique_sentences:
-                            unique_sentences.append(sentence)
+                    st.session_state.summary_cache = ". ".join(final_sentences).replace("..", ".") + "."
                     
-                    st.session_state.summary_cache = ". ".join(unique_sentences)
-                    
-                    # Keyword Extraction
-                    doc_k = nlp(raw_text[:8000].lower())
+                    # Keywords Extraction Logic
+                    doc_k = nlp(clean_input[:8000].lower())
                     kws = [t.text for t in doc_k if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
                     st.session_state.keywords_cache = [w.upper() for w, c in Counter(kws).most_common(6)]
                     
                     status.update(label="Analysis Complete", state="complete")
                 except Exception as e: 
-                    st.info("The engine is optimizing the summary for this document structure.")
+                    st.info("The neural engine is optimizing the summary for this document.")
+
+        # DISPLAY & DOWNLOAD SECTION
+        if st.session_state.summary_cache:
+            st.markdown(f'<div class="content-card"><b>Executive Summary:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
+            
+            if st.session_state.keywords_cache:
+                kw_html = "".join([f'<span style="background:#E0E7FF; color:#4338CA; padding:4px 12px; border-radius:15px; margin:4px; font-size:0.8rem; font-weight:bold; display:inline-block;">{k}</span>' for k in st.session_state.keywords_cache])
+                st.markdown(f'<div style="margin-bottom:20px;"><b>Key Insights:</b><br>{kw_html}</div>', unsafe_allow_html=True)
+            
+            # --- PDF REPORT GENERATION ---
+            try:
+                pdf_gen = FPDF()
+                pdf_gen.add_page()
+                pdf_gen.set_font("Arial", 'B', 16)
+                pdf_gen.cell(0, 10, "Nexus Intelligence Pro - Executive Report", ln=True, align='C')
+                pdf_gen.ln(10)
+                pdf_gen.set_font("Arial", size=12)
+                # Clean text to ensure Latin-1 compatibility for FPDF
+                safe_summary = clean_txt(st.session_state.summary_cache)
+                pdf_gen.multi_cell(0, 10, txt=safe_summary)
+                
+                report_data = pdf_gen.output(dest='S').encode('latin-1')
+                st.download_button(
+                    label="📥 DOWNLOAD REPORT", 
+                    data=report_data, 
+                    file_name="Nexus_Executive_Summary.pdf",
+                    mime="application/pdf"
+                )
+            except:
+                st.warning("Could not generate PDF report. You can still copy the text above.")
     elif module == "Ask Questions":
         # Centered action button
         if st.button("🔍 ANALYZE & GENERATE QUESTIONS"):
@@ -251,4 +284,5 @@ if file_source:
             st.download_button("📥 DOWNLOAD SPLIT PDF", output_data.getvalue(), "split.pdf")
 
 gc.collect()
+
 

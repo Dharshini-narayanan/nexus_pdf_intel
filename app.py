@@ -45,23 +45,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ------------------ 3. CORE ENGINE ------------------
 @st.cache_resource
 def load_models():
-    # Explicitly defining model and tokenizer prevents KeyErrors
-    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+    # Explicitly load to prevent KeyError during task inference
+    from transformers import pipeline
+    real_ai = pipeline("summarization", model="t5-small", tokenizer="t5-small", device=-1)
     
-    model_name = "t5-small"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    
-    real_ai = pipeline("summarization", model=model, tokenizer=tokenizer, device=-1)
-    
-    # Direct import for Spacy model pre-installed via requirements.txt
     import en_core_web_sm
     nlp = en_core_web_sm.load()
-    
     return real_ai, nlp
 
+# CRITICAL: Always initialize at the top level
+try:
+    real_ai, nlp = load_models()
+except Exception as e:
+    st.error(f"Engine failed to start: {e}")
+    st.stop() # Stops execution if AI engine isn't ready
 def clean_txt(text):
     return text.encode('latin-1', 'replace').decode('latin-1')
 
@@ -160,6 +160,7 @@ if file_source:
             st.download_button("📥 DOWNLOAD SPLIT", out.getvalue(), "split.pdf")
 
 gc.collect()
+
 
 
 

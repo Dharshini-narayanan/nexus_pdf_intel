@@ -11,106 +11,80 @@ from fpdf import FPDF
 # ------------------ 1. SYSTEM INITIALIZATION ------------------
 st.set_page_config(page_title="Nexus Intelligence | Pro", page_icon="⚛️", layout="wide")
 
+# Persistent Session State
 if 'summary_cache' not in st.session_state: st.session_state.summary_cache = ""
 if 'keywords_cache' not in st.session_state: st.session_state.keywords_cache = []
 if 'question_cache' not in st.session_state: st.session_state.question_cache = []
 if 'last_file' not in st.session_state: st.session_state.last_file = None
 
-# ===================== UI STYLING: CLEAN LIGHT THEME / COMPACT SIDEBAR =====================
+# ===================== UI STYLING =====================
 st.markdown("""
 <style>
-    /* Main Background */
     .stApp { background-color: #F8FAFC !important; color: #1E293B !important; }
-    
-    /* SIDEBAR: Ultra-compact Dark Theme */
     [data-testid="stSidebar"] { background-color: #1E293B !important; border-right: 2px solid #334155; }
-    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] { 
-        gap: 5px !important; 
-        padding-top: 0px; 
-    }
-    [data-testid="stSidebar"] .stRadio label p { 
-        color: #FFFFFF !important; 
-        font-size: 0.85rem !important; 
-        margin-bottom: 0px !important;
-    }
-    [data-testid="stSidebar"] h3 { color: white !important; margin-bottom: 10px; }
-
-    /* UPLOADER: Neat Alignment with RED Button */
-    [data-testid="stFileUploader"] {
-        border: 2px dashed #CBD5E1 !important;
-        border-radius: 10px !important;
-        background-color: #FFFFFF !important;
-        padding: 8px !important;
-    }
-    
-    /* THE RED BROWSE BUTTON */
-    div[data-testid="stFileUploader"] button[kind="secondary"] {
-        background-color: #FF0000 !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 4px !important;
-        padding: 5px 15px !important;
-        font-weight: bold !important;
-    }
-    
-    div[data-testid="stFileUploader"] button[kind="secondary"] p {
-        color: white !important;
-    }
-
+    [data-testid="stSidebar"] .stRadio label p { color: #FFFFFF !important; font-size: 0.95rem !important; }
     .main-header {
         background: linear-gradient(135deg, #6366F1 0%, #A855F7 100%);
-        padding: 1.2rem;
-        border-radius: 10px;
-        text-align: center;
-        margin-bottom: 20px;
-        color: white !important;
+        padding: 2rem; border-radius: 16px; text-align: center;
+        margin-bottom: 30px; color: white !important;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     }
-
     .content-card {
-        background: #FFFFFF;
-        padding: 1.2rem;
-        border-radius: 8px;
-        border: 1px solid #E2E8F0;
-        margin-bottom: 10px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        background: #FFFFFF; padding: 2rem; border-radius: 12px;
+        border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
     }
-
-    /* Action Buttons (Generate/Export) */
+    .q-card {
+        background: #F1F5F9; border-left: 4px solid #6366F1;
+        padding: 16px; margin-bottom: 12px; border-radius: 0 8px 8px 0;
+    }
     .stButton > button {
-        width: 100%;
-        background-color: #6366F1 !important;
-        color: white !important;
-        border-radius: 6px !important;
-        font-weight: bold !important;
+        width: 100%; background-color: #6366F1 !important; color: white !important;
+        border-radius: 8px !important; font-weight: bold !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------ 2. SIDEBAR ------------------
-with st.sidebar:
-    st.markdown("<h3 style='text-align:center;'>⚛️ NEXUS CORE</h3>", unsafe_allow_html=True)
-    module = st.radio("WORKSTREAM", ["Executive Summary", "Ask Questions", "PDF Splitter"], index=0)
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🗑️ RESET"):
-        st.session_state.clear()
-        st.rerun()
-
-# ------------------ 3. CORE ENGINE ------------------
+# ------------------ 2. CORE ENGINE ------------------
 @st.cache_resource
 def load_models():
-    real_ai = pipeline("summarization", model="t5-small", device=-1)
-    nlp = spacy.load("en_core_web_sm")
-    return real_ai, nlp
+    try:
+        from transformers import pipeline
+        # Explicitly defining model/tokenizer prevents KeyErrors
+        model_id = "t5-small"
+        summarizer = pipeline("summarization", model=model_id, tokenizer=model_id, framework="pt", device=-1)
+        
+        # Load Spacy safely
+        import en_core_web_sm
+        nlp_model = en_core_web_sm.load()
+        return summarizer, nlp_model
+    except Exception as e:
+        st.error(f"Engine Startup Failed: {e}")
+        return None, None
 
+# Global Initialization - Fixes NameError
 real_ai, nlp = load_models()
+
+# Stop execution if engine failed so you don't get 'not defined' errors later
+if real_ai is None or nlp is None:
+    st.warning("⚠️ AI Engine is still installing dependencies. Please wait 1 minute and refresh.")
+    st.stop()
 
 def clean_txt(text):
     return text.encode('latin-1', 'replace').decode('latin-1')
 
-# ------------------ 4. MAIN WORKSPACE ------------------
-st.markdown('<div class="main-header"><h1>Intelligence Studio Pro</h1></div>', unsafe_allow_html=True)
+# ------------------ 3. SIDEBAR ------------------
+with st.sidebar:
+    st.markdown("<h3 style='text-align:center; color:white;'>⚛️ NEXUS CORE</h3>", unsafe_allow_html=True)
+    module = st.radio("WORKSTREAM", ["Executive Summary", "Ask Questions", "PDF Splitter"], index=0)
+    if st.button("🗑️ RESET SESSION"):
+        st.session_state.clear()
+        st.rerun()
 
-file_source = st.file_uploader("Upload PDF", type="pdf")
+# ------------------ 4. MAIN WORKSPACE ------------------
+st.markdown('<div class="main-header"><h1>Intelligence Studio Pro</h1><p style="opacity:0.9;">Neural Synthesis & Document Analytics</p></div>', unsafe_allow_html=True)
+
+file_source = st.file_uploader("Upload your document (PDF)", type="pdf")
 
 if file_source:
     if st.session_state.last_file != file_source.name:
@@ -125,62 +99,72 @@ if file_source:
 
     if module == "Executive Summary":
         if st.button("🚀 EXECUTE SUMMARY"):
-            with st.status("Analyzing...") as status:
+            with st.status("Neural processing...") as status:
                 try:
                     with pdfplumber.open(file_source) as pdf:
-                        target_pages = [0, total_pages//2, total_pages-1]
-                        raw_text = "".join([pdf.pages[i].extract_text() or "" for i in target_pages])
+                        indices = sorted(list(set([0, total_pages//2, total_pages-1])))
+                        raw_text = " ".join([pdf.pages[i].extract_text() or "" for i in indices if i < total_pages])
                     
-                    chunks = [raw_text[i:i+800] for i in range(0, min(len(raw_text), 2400), 800)]
-                    summaries = [real_ai(c, max_length=50, min_length=20, do_sample=False)[0]['summary_text'] for c in chunks]
-                    st.session_state.summary_cache = ". ".join(summaries).replace(" .", ".")
+                    if not raw_text.strip():
+                        st.error("No readable text found.")
+                        st.stop()
+
+                    clean_input = " ".join(raw_text.split())
+                    # Mandatory for Google T5: 'summarize: ' prefix
+                    chunks = ["summarize: " + clean_input[i:i+800] for i in range(0, min(len(clean_input), 2400), 800)]
                     
-                    doc_k = nlp(raw_text[:8000].lower())
+                    summaries = []
+                    for c in chunks:
+                        if len(c) > 60:
+                            res = real_ai(c, max_length=100, min_length=30, do_sample=False)[0]['summary_text']
+                            summaries.append(res.strip())
+                    
+                    st.session_state.summary_cache = ". ".join(summaries).capitalize() + "."
+                    
+                    doc_k = nlp(clean_input[:5000].lower())
                     kws = [t.text for t in doc_k if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
                     st.session_state.keywords_cache = [w.upper() for w, c in Counter(kws).most_common(6)]
                     status.update(label="Complete", state="complete")
-                except: st.error("Neural analysis failed.")
+                except Exception as e:
+                    st.error(f"Analysis Error: {e}")
 
         if st.session_state.summary_cache:
-            st.markdown(f'<div class="content-card"><b>Executive Summary:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
-            if st.session_state.keywords_cache:
-                kw_html = "".join([f'<span style="background:#E0E7FF; color:#4338CA; padding:2px 8px; border-radius:12px; margin:2px; font-size:0.7rem; font-weight:bold; display:inline-block;">{k}</span>' for k in st.session_state.keywords_cache])
-                st.markdown(f'<b>Insights:</b><br>{kw_html}', unsafe_allow_html=True)
+            st.markdown(f'<div class="content-card"><b>Analysis Result:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
+            kw_html = "".join([f'<span style="background:#E0E7FF; color:#4338CA; padding:4px 12px; border-radius:15px; margin:4px; font-weight:bold; display:inline-block;">{k}</span>' for k in st.session_state.keywords_cache])
+            st.markdown(f'<div>{kw_html}</div>', unsafe_allow_html=True)
             
-            pdf_gen = FPDF()
-            pdf_gen.add_page(); pdf_gen.set_font("Arial", size=12)
+            pdf_gen = FPDF(); pdf_gen.add_page(); pdf_gen.set_font("Arial", size=12)
             pdf_gen.multi_cell(0, 10, txt=clean_txt(st.session_state.summary_cache))
-            st.download_button(label="📥 DOWNLOAD REPORT", data=pdf_gen.output(dest='S').encode('latin-1'), file_name="Report.pdf")
+            st.download_button("📥 DOWNLOAD SUMMARY", pdf_gen.output(dest='S').encode('latin-1'), "Summary.pdf")
 
     elif module == "Ask Questions":
         if st.button("🔍 GENERATE QUESTIONS"):
-            with st.spinner("Mining insights..."):
+            with st.spinner("Extracting insights..."):
                 with pdfplumber.open(file_source) as pdf:
-                    text = (pdf.pages[0].extract_text() or "") + " " + (pdf.pages[-1].extract_text() or "")
-                doc_q = nlp(text[:8000])
-                subjects = list(dict.fromkeys([chunk.text.strip() for chunk in doc_q.noun_chunks if len(chunk.text) > 5]))
-                templates = ["What are the objectives for {}?", "How is {} evaluated?", "What risks affect {}?"]
-                st.session_state.question_cache = [templates[i%3].format(subjects[i]) for i in range(min(len(subjects), 10))]
-        
+                    text = (pdf.pages[0].extract_text() or "")[:3000]
+                
+                doc_q = nlp(text)
+                subjects = list(dict.fromkeys([chunk.text.strip() for chunk in doc_q.noun_chunks if len(chunk.text) > 4]))
+                
+                templates = ["What defines {} in this context?", "How is {} addressed?", "What are the risks of {}?"]
+                st.session_state.question_cache = [templates[i%3].format(subjects[i%len(subjects)]) for i in range(6)]
+
         for q in st.session_state.question_cache:
-            st.markdown(f'<div style="background:#F1F5F9; border-left:4px solid #6366F1; padding:10px; margin-bottom:8px; border-radius:4px;">{q}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="q-card">{q}</div>', unsafe_allow_html=True)
 
     elif module == "PDF Splitter":
         st.info(f"Document has {total_pages} pages.")
         col1, col2 = st.columns(2)
-        s_p = col1.number_input("Start Page", 1, total_pages, 1)
-        e_p = col2.number_input("End Page", 1, total_pages, total_pages)
-        if st.button("✂️ EXPORT PDF"):
+        s_p = col1.number_input("Start", 1, total_pages, 1)
+        e_p = col2.number_input("End", 1, total_pages, total_pages)
+        if st.button("✂️ SPLIT PDF"):
             writer = PdfWriter()
             for i in range(int(s_p)-1, int(e_p)): writer.add_page(pdf_reader.pages[i])
-            
-            # --- FIX APPLIED HERE: .getvalue() added parentheses ---
-            output_data = io.BytesIO()
-            writer.write(output_data)
-            st.download_button("📥 DOWNLOAD SPLIT PDF", output_data.getvalue(), "split.pdf")
+            out = io.BytesIO()
+            writer.write(out)
+            st.download_button("📥 DOWNLOAD SPLIT", out.getvalue(), "split.pdf")
 
 gc.collect()
-
 
 
 

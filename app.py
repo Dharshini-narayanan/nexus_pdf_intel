@@ -109,11 +109,18 @@ with st.sidebar:
 # ------------------ 3. CORE ENGINE ------------------
 @st.cache_resource
 def load_models():
-    real_ai = pipeline("summarization", model="t5-small", device=-1)
-    nlp = spacy.load("en_core_web_sm")
+    # Adding tokenizer and framework explicitly prevents the KeyError
+    real_ai = pipeline(
+        "summarization", 
+        model="t5-small", 
+        tokenizer="t5-small", 
+        framework="pt", 
+        device=-1
+    )
+    # Load spacy using the direct string name
+    import en_core_web_sm
+    nlp = en_core_web_sm.load()
     return real_ai, nlp
-
-real_ai, nlp = load_models()
 
 def clean_txt(text):
     return text.encode('latin-1', 'replace').decode('latin-1')
@@ -248,6 +255,7 @@ if file_source:
             st.download_button("📥 DOWNLOAD SPLIT PDF", output_data.getvalue(), "split.pdf")
 
 gc.collect()
+
 
 
 

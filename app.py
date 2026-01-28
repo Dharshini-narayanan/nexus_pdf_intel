@@ -142,47 +142,40 @@ if file_source:
     pdf_reader = PdfReader(file_source)
     total_pages = len(pdf_reader.pages)
 
-    if module == "Executive Summary":
-        if st.button("🚀 EXECUTE SUMMARY"):
-            with st.status("Analyzing...") as status:
-                try:
-                    with pdfplumber.open(file_source) as pdf:
-                        indices = sorted(list(set([0, total_pages//2, total_pages-1])))
-                        raw_text = " ".join([pdf.pages[i].extract_text() or "" for i in indices if i < total_pages])
-                    
-                    clean_input = " ".join(raw_text.split())
-                    chunks = [clean_input[i:i+900] for i in range(0, min(len(clean_input), 2700), 900)]
-                    
-                    summaries = []
-                    for c in chunks:
-                        if len(c) > 50:
-                            res = real_ai(c, max_length=60, min_length=25, do_sample=False, 
-                                          repetition_penalty=3.5, no_repeat_ngram_size=3)[0]['summary_text']
-                            summaries.append(res.strip())
-                    
-                    # Deduplication Logic
-                    unique_sentences = []
-                    full_text = ". ".join(summaries).replace(" .", ".")
-                    for sent in full_text.split(". "):
-                        if sent not in unique_sentences and len(sent) > 10:
-                            unique_sentences.append(sent)
-                    
-                    st.session_state.summary_cache = ". ".join(unique_sentences).strip() + "."
-                    
-                    doc_k = nlp(clean_input[:8000].lower())
-                    kws = [t.text for t in doc_k if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
-                    st.session_state.keywords_cache = [w.upper() for w, c in Counter(kws).most_common(6)]
-                    status.update(label="Analysis Complete", state="complete")
-                except: st.info("Optimizing summary for document structure...")
+   if module == "Executive Summary":
+    if st.button("🚀 EXECUTE SUMMARY"):
+        with st.status("Analyzing...") as status:
+            try:
+                with pdfplumber.open(file_source) as pdf:
+                    # Logic: Sample start, middle, and end for context
+                    indices = sorted(list(set([0, total_pages//2, total_pages-1])))
+                    raw_text = " ".join([pdf.pages[i].extract_text() or "" for i in indices if i < total_pages])
+                
+                if not raw_text.strip():
+                    st.error("❌ No readable text found. This PDF might be an image or scan.")
+                    st.stop()
 
-        if st.session_state.summary_cache:
-            st.markdown(f'<div class="content-card"><b>Executive Summary:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
-            kw_html = "".join([f'<span style="background:#E0E7FF; color:#4338CA; padding:4px 12px; border-radius:15px; margin:4px; font-size:0.8rem; font-weight:bold; display:inline-block;">{k}</span>' for k in st.session_state.keywords_cache])
-            st.markdown(f'<div style="margin-bottom:20px;">{kw_html}</div>', unsafe_allow_html=True)
-            
-            pdf_gen = FPDF(); pdf_gen.add_page(); pdf_gen.set_font("Arial", size=12)
-            pdf_gen.multi_cell(0, 10, txt=clean_txt(st.session_state.summary_cache))
-            st.download_button("📥 DOWNLOAD REPORT", pdf_gen.output(dest='S').encode('latin-1'), "Executive_Summary.pdf")
+                clean_input = " ".join(raw_text.split())
+                # Mandatory for T5: Every input must start with 'summarize: '
+                chunks = ["summarize: " + clean_input[i:i+900] for i in range(0, min(len(clean_input), 2700), 900)]
+                
+                summaries = []
+                for c in chunks:
+                    if len(c) > 60:  # Skip 'summarize: ' only chunks
+                        res = real_ai(c, max_length=100, min_length=30, do_sample=False)[0]['summary_text']
+                        summaries.append(res.strip())
+                
+                # Combine and format
+                final_summary = " ".join(summaries).replace(" .", ".")
+                st.session_state.summary_cache = final_summary
+                
+                # Extract Keywords
+                doc_k = nlp(clean_input[:8000].lower())
+                kws = [t.text for t in doc_k if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
+                st.session_state.keywords_cache = [w.upper() for w, c in Counter(kws).most_common(6)]
+                status.update(label="Analysis Complete", state="complete")
+            except Exception as e:
+                st.error(f"Optimization error: {e}")
 
     elif module == "Ask Questions":
         # Centered action button
@@ -256,6 +249,7 @@ if file_source:
             st.download_button("📥 DOWNLOAD SPLIT PDF", output_data.getvalue(), "split.pdf")
 
 gc.collect()
+
 
 
 

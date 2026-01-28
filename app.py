@@ -45,23 +45,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ------------------ 3. CORE ENGINE ------------------
+# ------------------ 2. CORE ENGINE ------------------
 @st.cache_resource
 def load_models():
-    # Explicitly load to prevent KeyError during task inference
+    # Explicitly defining model and tokenizer prevents KeyErrors
     from transformers import pipeline
-    real_ai = pipeline("summarization", model="t5-small", tokenizer="t5-small", device=-1)
+    model_id = "t5-small"
+    # Mandatory for T5: specific task pipeline
+    summarizer = pipeline("summarization", model=model_id, tokenizer=model_id, device=-1)
     
+    # Load Spacy model installed via requirements.txt
     import en_core_web_sm
-    nlp = en_core_web_sm.load()
-    return real_ai, nlp
+    nlp_model = en_core_web_sm.load()
+    return summarizer, nlp_model
 
-# CRITICAL: Always initialize at the top level
+# Global Initialization to prevent NameError: 'real_ai' is not defined
 try:
     real_ai, nlp = load_models()
 except Exception as e:
-    st.error(f"Engine failed to start: {e}")
-    st.stop() # Stops execution if AI engine isn't ready
+    st.error(f"Engine Failure: {e}")
+    st.stop()
+
 def clean_txt(text):
     return text.encode('latin-1', 'replace').decode('latin-1')
 
@@ -94,40 +98,40 @@ if file_source:
             with st.status("Neural processing...") as status:
                 try:
                     with pdfplumber.open(file_source) as pdf:
-                        # Improved Sampling: Front, Middle, Back
+                        # Improved Sampling
                         indices = sorted(list(set([0, total_pages//2, total_pages-1])))
                         raw_text = " ".join([pdf.pages[i].extract_text() or "" for i in indices if i < total_pages])
                     
                     if not raw_text.strip():
-                        st.error("No readable text found in PDF.")
+                        st.error("No readable text found.")
                         st.stop()
 
                     clean_input = " ".join(raw_text.split())
-                    # FIXED: Added "summarize: " prefix mandatory for T5
+                    # Mandatory for Google T5: Prefix 'summarize: '
                     chunks = ["summarize: " + clean_input[i:i+800] for i in range(0, min(len(clean_input), 2400), 800)]
                     
                     summaries = []
                     for c in chunks:
-                        if len(c) > 50:
-                            res = real_ai(c, max_length=80, min_length=30, do_sample=False)[0]['summary_text']
+                        if len(c) > 60:
+                            res = real_ai(c, max_length=100, min_length=30, do_sample=False)[0]['summary_text']
                             summaries.append(res.strip())
                     
                     st.session_state.summary_cache = ". ".join(summaries).capitalize() + "."
                     
-                    # Keywords
+                    # Keywords extraction
                     doc_k = nlp(clean_input[:5000].lower())
                     kws = [t.text for t in doc_k if t.pos_ in ["NOUN", "PROPN"] and not t.is_stop and len(t.text) > 4]
                     st.session_state.keywords_cache = [w.upper() for w, c in Counter(kws).most_common(6)]
                     status.update(label="Complete", state="complete")
                 except Exception as e:
-                    st.error(f"AI Engine Error: {e}")
+                    st.error(f"Analysis Error: {e}")
 
         if st.session_state.summary_cache:
             st.markdown(f'<div class="content-card"><b>Analysis Result:</b><br><br>{st.session_state.summary_cache}</div>', unsafe_allow_html=True)
             kw_html = "".join([f'<span style="background:#E0E7FF; color:#4338CA; padding:4px 12px; border-radius:15px; margin:4px; font-weight:bold; display:inline-block;">{k}</span>' for k in st.session_state.keywords_cache])
             st.markdown(f'<div>{kw_html}</div>', unsafe_allow_html=True)
             
-            # Export
+            # PDF Export
             pdf_gen = FPDF(); pdf_gen.add_page(); pdf_gen.set_font("Arial", size=12)
             pdf_gen.multi_cell(0, 10, txt=clean_txt(st.session_state.summary_cache))
             st.download_button("📥 DOWNLOAD SUMMARY", pdf_gen.output(dest='S').encode('latin-1'), "Summary.pdf")
@@ -160,7 +164,6 @@ if file_source:
             st.download_button("📥 DOWNLOAD SPLIT", out.getvalue(), "split.pdf")
 
 gc.collect()
-
 
 
 

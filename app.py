@@ -49,17 +49,17 @@ st.markdown("""
 @st.cache_resource
 def load_models():
     try:
-        from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
+        from transformers import pipeline, AutoModelForSeq2SeqLM, AutoTokenizer
         
-        # Explicitly loading tokenizer and model prevents the 'Unknown task' error
         model_name = "t5-small"
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # Explicitly loading prevents the "Unknown task" KeyError
+        tokenizer = AutoTokenizer.from_pretrained(model_name, legacy=False)
         model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
         
         summarizer = pipeline(
             "summarization", 
             model=model, 
-            tokenizer=tokenizer, 
+            tokenizer=tokenizer,
             framework="pt"
         )
         
@@ -67,10 +67,17 @@ def load_models():
         nlp_model = en_core_web_sm.load()
         return summarizer, nlp_model
     except Exception as e:
-        # This will display the technical cause if it fails again
+        # This will catch and show the exact error if it fails
         st.error(f"Engine Startup Failed: {e}")
         return None, None
 
+# Global initialization to prevent "real_ai is not defined"
+real_ai, nlp = load_models()
+
+# Critical stop: If loading fails, stop the app to avoid red name errors
+if real_ai is None or nlp is None:
+    st.warning("⚠️ AI Engine is still installing dependencies. Please wait 60 seconds and refresh.")
+    st.stop()
 # Initialization Safeguard - This fixes the NameError
 real_ai, nlp = load_models()
 
@@ -172,6 +179,7 @@ if file_source:
             st.download_button("📥 DOWNLOAD SPLIT", out.getvalue(), "split.pdf")
 
 gc.collect()
+
 
 
 

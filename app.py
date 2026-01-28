@@ -47,12 +47,11 @@ st.markdown("""
 
 # ------------------ 2. CORE ENGINE ------------------
 @st.cache_resource
-@st.cache_resource
 def load_models():
     try:
         from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
         
-        # Manually loading tokenizer and model prevents the 'Unknown task' KeyError
+        # Explicitly loading tokenizer and model prevents the 'Unknown task' error
         model_name = "t5-small"
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
@@ -68,24 +67,16 @@ def load_models():
         nlp_model = en_core_web_sm.load()
         return summarizer, nlp_model
     except Exception as e:
-        # This will print the actual technical reason if it still fails
+        # This will display the technical cause if it fails again
         st.error(f"Engine Startup Failed: {e}")
         return None, None
 
-# Initialization Safeguard
+# Initialization Safeguard - This fixes the NameError
 real_ai, nlp = load_models()
 
 if real_ai is None or nlp is None:
-    st.warning("⚠️ AI Engine is initializing dependencies. This usually takes 60 seconds. Please refresh the page in a moment.")
+    st.warning("⚠️ AI Engine is initializing dependencies. This takes about 60 seconds. Please refresh the page in a moment.")
     st.stop()
-# Global Initialization - Fixes NameError
-real_ai, nlp = load_models()
-
-# Stop execution if engine failed so you don't get 'not defined' errors later
-if real_ai is None or nlp is None:
-    st.warning("⚠️ AI Engine is still installing dependencies. Please wait 1 minute and refresh.")
-    st.stop()
-
 def clean_txt(text):
     return text.encode('latin-1', 'replace').decode('latin-1')
 
@@ -181,6 +172,7 @@ if file_source:
             st.download_button("📥 DOWNLOAD SPLIT", out.getvalue(), "split.pdf")
 
 gc.collect()
+
 
 
 

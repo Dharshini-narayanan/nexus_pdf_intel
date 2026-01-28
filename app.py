@@ -109,19 +109,20 @@ with st.sidebar:
 # ------------------ 3. CORE ENGINE ------------------
 @st.cache_resource
 def load_models():
-    # Adding tokenizer and framework explicitly prevents the KeyError
-    real_ai = pipeline(
-        "summarization", 
-        model="t5-small", 
-        tokenizer="t5-small", 
-        framework="pt", 
-        device=-1
-    )
-    # Load spacy using the direct string name
+    # Explicitly defining the model and tokenizer prevents KeyErrors
+    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+    
+    model_name = "t5-small"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    
+    real_ai = pipeline("summarization", model=model, tokenizer=tokenizer, device=-1)
+    
+    # Direct import for Spacy model installed via URL in requirements
     import en_core_web_sm
     nlp = en_core_web_sm.load()
+    
     return real_ai, nlp
-
 def clean_txt(text):
     return text.encode('latin-1', 'replace').decode('latin-1')
 
@@ -255,6 +256,7 @@ if file_source:
             st.download_button("📥 DOWNLOAD SPLIT PDF", output_data.getvalue(), "split.pdf")
 
 gc.collect()
+
 
 
 

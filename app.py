@@ -46,24 +46,28 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------ 2. CORE ENGINE ------------------
+# ------------------ 2. CORE ENGINE ------------------
 @st.cache_resource
 def load_models():
-    # Explicitly defining model and tokenizer prevents KeyErrors
-    from transformers import pipeline
-    model_id = "t5-small"
-    # Mandatory for T5: specific task pipeline
-    summarizer = pipeline("summarization", model=model_id, tokenizer=model_id, device=-1)
-    
-    # Load Spacy model installed via requirements.txt
-    import en_core_web_sm
-    nlp_model = en_core_web_sm.load()
-    return summarizer, nlp_model
+    try:
+        from transformers import pipeline
+        # Force the framework to PyTorch ('pt') to avoid environment confusion
+        summarizer = pipeline("summarization", model="t5-small", tokenizer="t5-small", framework="pt", device=-1)
+        
+        import en_core_web_sm
+        nlp_model = en_core_web_sm.load()
+        return summarizer, nlp_model
+    except Exception as e:
+        # This will show you the EXACT error on the screen if it fails
+        st.error(f"AI Engine failed to load. Error: {e}")
+        return None, None
 
-# Global Initialization to prevent NameError: 'real_ai' is not defined
-try:
-    real_ai, nlp = load_models()
-except Exception as e:
-    st.error(f"Engine Failure: {e}")
+# Global Initialization
+real_ai, nlp = load_models()
+
+# If the models failed to load, stop the app immediately so you don't get 'not defined' errors
+if real_ai is None or nlp is None:
+    st.warning("⚠️ The AI Engine is still warming up or installing dependencies. Please wait 2 minutes and refresh.")
     st.stop()
 
 def clean_txt(text):
@@ -164,6 +168,7 @@ if file_source:
             st.download_button("📥 DOWNLOAD SPLIT", out.getvalue(), "split.pdf")
 
 gc.collect()
+
 
 
 

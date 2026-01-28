@@ -47,21 +47,37 @@ st.markdown("""
 
 # ------------------ 2. CORE ENGINE ------------------
 @st.cache_resource
+@st.cache_resource
 def load_models():
     try:
-        from transformers import pipeline
-        # Explicitly defining model/tokenizer prevents KeyErrors
-        model_id = "t5-small"
-        summarizer = pipeline("summarization", model=model_id, tokenizer=model_id, framework="pt", device=-1)
+        from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
         
-        # Load Spacy safely
+        # Manually loading tokenizer and model prevents the 'Unknown task' KeyError
+        model_name = "t5-small"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        
+        summarizer = pipeline(
+            "summarization", 
+            model=model, 
+            tokenizer=tokenizer, 
+            framework="pt"
+        )
+        
         import en_core_web_sm
         nlp_model = en_core_web_sm.load()
         return summarizer, nlp_model
     except Exception as e:
+        # This will print the actual technical reason if it still fails
         st.error(f"Engine Startup Failed: {e}")
         return None, None
 
+# Initialization Safeguard
+real_ai, nlp = load_models()
+
+if real_ai is None or nlp is None:
+    st.warning("⚠️ AI Engine is initializing dependencies. This usually takes 60 seconds. Please refresh the page in a moment.")
+    st.stop()
 # Global Initialization - Fixes NameError
 real_ai, nlp = load_models()
 
@@ -165,6 +181,7 @@ if file_source:
             st.download_button("📥 DOWNLOAD SPLIT", out.getvalue(), "split.pdf")
 
 gc.collect()
+
 
 
 

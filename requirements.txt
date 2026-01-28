@@ -1,7 +1,7 @@
 streamlit
 pdfplumber
 pypdf
-transformers[torch]
+transformers>=4.40.0
 torch
 sentencepiece
 fpdf
